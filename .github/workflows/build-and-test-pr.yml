@@ -473,7 +473,7 @@ jobs:
           path: "./dubbo"
       - uses: actions/checkout@v3
         with:
-          repository: 'apache/dubbo-samples'
+          repository: 'Rawven/dubbo-samples'
           path: "./dubbo-samples"
       - uses: actions/checkout@v3
         with:
