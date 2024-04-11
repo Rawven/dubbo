@@ -84,7 +84,11 @@ public final class DefaultRequestMappingRegistry implements RequestMappingRegist
                 }
                 RequestMapping classMapping = resolver.resolve(serviceMeta);
                 if (classMapping != null) {
-                    classMapping.setCorsMeta(classMapping.getCorsMeta().combine(getGlobalCorsMeta()));
+                    if(classMapping.getCorsMeta()!=null) {
+                        classMapping.setCorsMeta(classMapping.getCorsMeta().combine(getGlobalCorsMeta()));
+                    }else {
+                        classMapping.setCorsMeta(getGlobalCorsMeta());
+                    }
                 }
                 consumer.accept((methods) -> {
                     MethodMeta methodMeta = new MethodMeta(methods, serviceMeta);
