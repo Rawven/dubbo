@@ -264,7 +264,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          repositorrepository: 'Rawven/dubbo-samples'
+          repository: 'Rawven/dubbo-samples'
           ref: 3.3-triple-cors
       - name: "Prepare test list"
         run: |
@@ -289,7 +289,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          repositorrepository: 'Rawven/dubbo-samples'
+          repository: 'Rawven/dubbo-samples'
           ref: 3.3-triple-cors
       - name: "Cache local Maven repository"
         uses: actions/cache@v3
