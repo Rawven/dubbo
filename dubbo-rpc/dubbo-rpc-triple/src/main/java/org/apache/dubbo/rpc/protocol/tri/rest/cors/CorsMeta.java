@@ -16,6 +16,7 @@
  */
 package org.apache.dubbo.rpc.protocol.tri.rest.cors;
 
+import org.apache.dubbo.common.lang.Nullable;
 import org.apache.dubbo.common.utils.CollectionUtils;
 import org.apache.dubbo.common.utils.StringUtils;
 import org.apache.dubbo.remoting.http12.HttpMethods;
@@ -53,24 +54,31 @@ public class CorsMeta {
 
     public static final Long DEFAULT_MAX_AGE = 1800L;
 
-    // Fields
-
+    @Nullable
     private List<String> allowedOrigins;
 
+    @Nullable
     private List<OriginPattern> allowedOriginPatterns;
 
+    @Nullable
     private List<String> allowedMethods;
 
+    @Nullable
     private List<HttpMethods> resolvedMethods = DEFAULT_METHODS;
 
+    @Nullable
     private List<String> allowedHeaders;
 
+    @Nullable
     private List<String> exposedHeaders;
 
+    @Nullable
     private Boolean allowCredentials;
 
+    @Nullable
     private Boolean allowPrivateNetwork;
 
+    @Nullable
     private Long maxAge;
 
     public CorsMeta() {}
@@ -87,7 +95,7 @@ public class CorsMeta {
         this.maxAge = other.maxAge;
     }
 
-    public void setAllowedOrigins(List<String> origins) {
+    public void setAllowedOrigins(@Nullable List<String> origins) {
         this.allowedOrigins = (origins == null
                 ? null
                 : origins.stream()
@@ -104,7 +112,7 @@ public class CorsMeta {
         return this.allowedOrigins;
     }
 
-    public void addAllowedOrigin(String origin) {
+    public void addAllowedOrigin(@Nullable String origin) {
         if (origin == null) {
             return;
         }
@@ -117,7 +125,7 @@ public class CorsMeta {
         this.allowedOrigins.add(origin);
     }
 
-    public void setAllowedOriginPatterns(List<String> allowedOriginPatterns) {
+    public void setAllowedOriginPatterns(@Nullable List<String> allowedOriginPatterns) {
         if (allowedOriginPatterns == null) {
             this.allowedOriginPatterns = null;
         } else {
@@ -128,6 +136,7 @@ public class CorsMeta {
         }
     }
 
+    @Nullable
     public List<String> getAllowedOriginPatterns() {
         if (this.allowedOriginPatterns == null) {
             return null;
@@ -137,7 +146,7 @@ public class CorsMeta {
                 .collect(Collectors.toList());
     }
 
-    public void addAllowedOriginPattern(String originPattern) {
+    public void addAllowedOriginPattern(@Nullable String originPattern) {
         if (originPattern == null) {
             return;
         }
@@ -151,9 +160,18 @@ public class CorsMeta {
         }
     }
 
-    public void setAllowedMethods(List<String> allowedMethods) {
-        this.allowedMethods = (allowedMethods != null ? new ArrayList<>(allowedMethods) : null);
-        if (!CollectionUtils.isEmpty(allowedMethods)) {
+    public void setAllowedMethods(@Nullable List<String> allowedMethods) {
+        if (allowedMethods != null) {
+            this.allowedMethods = new ArrayList<>(allowedMethods);
+            setResolvedMethods(allowedMethods);
+        } else {
+            this.allowedMethods = null;
+        }
+    }
+
+    @Nullable
+    public void setResolvedMethods(List<String> allowedMethods) {
+        if (!allowedMethods.isEmpty()) {
             this.resolvedMethods = new ArrayList<>(allowedMethods.size());
             for (String method : allowedMethods) {
                 if (ALL.equals(method)) {
@@ -192,7 +210,7 @@ public class CorsMeta {
         }
     }
 
-    public void setAllowedHeaders(List<String> allowedHeaders) {
+    public void setAllowedHeaders(@Nullable List<String> allowedHeaders) {
         this.allowedHeaders = (allowedHeaders != null ? new ArrayList<>(allowedHeaders) : null);
     }
 
@@ -209,7 +227,7 @@ public class CorsMeta {
         this.allowedHeaders.add(allowedHeader);
     }
 
-    public void setExposedHeaders(List<String> exposedHeaders) {
+    public void setExposedHeaders(@Nullable List<String> exposedHeaders) {
         this.exposedHeaders = (exposedHeaders != null ? new ArrayList<>(exposedHeaders) : null);
     }
 
@@ -224,10 +242,11 @@ public class CorsMeta {
         this.exposedHeaders.add(exposedHeader);
     }
 
-    public void setAllowCredentials(Boolean allowCredentials) {
+    public void setAllowCredentials(@Nullable Boolean allowCredentials) {
         this.allowCredentials = allowCredentials;
     }
 
+    @Nullable
     public Boolean getAllowCredentials() {
         return this.allowCredentials;
     }
@@ -240,10 +259,11 @@ public class CorsMeta {
         return this.allowPrivateNetwork;
     }
 
-    public void setMaxAge(Long maxAge) {
+    public void setMaxAge(@Nullable Long maxAge) {
         this.maxAge = maxAge;
     }
 
+    @Nullable
     public Long getMaxAge() {
         return this.maxAge;
     }
@@ -300,9 +320,9 @@ public class CorsMeta {
      * @param other other
      * @return {@link CorsMeta}
      */
-    public static CorsMeta combine(CorsMeta priority, CorsMeta other) {
+    public static CorsMeta combine(@Nullable CorsMeta priority, @Nullable CorsMeta other) {
         if (priority == null && other == null) {
-            return null;
+            return new CorsMeta();
         }
         if (priority == null) {
             return other;
@@ -338,7 +358,7 @@ public class CorsMeta {
      * @param other  The secondary list of strings to be combined with the source.
      * @return A combined list of strings, with the source list taking priority in case of conflicts.
      */
-    private List<String> combine(List<String> source, List<String> other) {
+    private List<String> combine(@Nullable List<String> source, @Nullable List<String> other) {
         if (other == null) {
             return (source != null ? source : Collections.emptyList());
         }
@@ -362,7 +382,8 @@ public class CorsMeta {
         return new ArrayList<>(combined);
     }
 
-    private List<OriginPattern> combinePatterns(List<OriginPattern> source, List<OriginPattern> other) {
+    private List<OriginPattern> combinePatterns(
+            @Nullable List<OriginPattern> source, @Nullable List<OriginPattern> other) {
 
         if (other == null) {
             return (source != null ? source : Collections.emptyList());
@@ -379,36 +400,52 @@ public class CorsMeta {
         return new ArrayList<>(combined);
     }
 
-    public String checkOrigin(String origin) {
+    public String checkOrigin(@Nullable String origin) {
         if (!StringUtils.hasText(origin)) {
             return null;
         }
         String originToCheck = trimTrailingSlash(origin);
         if (!CollectionUtils.isEmpty(this.allowedOrigins)) {
             if (this.allowedOrigins.contains(ALL)) {
-                if (validateAllowCredentials() || validateAllowPrivateNetwork()) {
-                    return null;
-                }
-                return ALL;
+                return allOriginAllowed();
             }
-            for (String allowedOrigin : this.allowedOrigins) {
-                if (originToCheck.equalsIgnoreCase(allowedOrigin)) {
-                    return origin;
-                }
+            if (isOriginAllowed(originToCheck)) {
+                return origin;
             }
         }
-        if (!CollectionUtils.isEmpty(this.allowedOriginPatterns)) {
-            for (OriginPattern p : this.allowedOriginPatterns) {
-                if (p.getDeclaredPattern().equals(ALL)
-                        || p.getPattern().matcher(originToCheck).matches()) {
-                    return origin;
-                }
-            }
+        if (isOriginPatternAllowed(originToCheck)) {
+            return origin;
         }
         return null;
     }
 
-    public List<HttpMethods> checkHttpMethods(HttpMethods requestMethod) {
+    private String allOriginAllowed() {
+        return (validateAllowCredentials() || validateAllowPrivateNetwork() ? null : ALL);
+    }
+
+    private boolean isOriginAllowed(String originToCheck) {
+        for (String allowedOrigin : this.allowedOrigins) {
+            if (originToCheck.equalsIgnoreCase(allowedOrigin)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isOriginPatternAllowed(String originToCheck) {
+        if (!CollectionUtils.isEmpty(this.allowedOriginPatterns)) {
+            for (OriginPattern p : this.allowedOriginPatterns) {
+                if (p.getDeclaredPattern().equals(ALL)
+                        || p.getPattern().matcher(originToCheck).matches()) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    @Nullable
+    public List<HttpMethods> checkHttpMethods(@Nullable HttpMethods requestMethod) {
         if (requestMethod == null) {
             return null;
         }
@@ -418,7 +455,8 @@ public class CorsMeta {
         return (this.resolvedMethods.contains(requestMethod) ? this.resolvedMethods : null);
     }
 
-    public List<String> checkHeaders(List<String> requestHeaders) {
+    @Nullable
+    public List<String> checkHeaders(@Nullable List<String> requestHeaders) {
         if (requestHeaders == null) {
             return null;
         }
@@ -430,22 +468,30 @@ public class CorsMeta {
         }
         boolean allowAnyHeader = this.allowedHeaders.contains(ALL);
         List<String> result = new ArrayList<>(requestHeaders.size());
+        loadAllowedHeaders(requestHeaders, result, allowAnyHeader);
+        return (result.isEmpty() ? null : result);
+    }
+
+    private void loadAllowedHeaders(List<String> requestHeaders, List<String> result, boolean allowAnyHeader) {
         for (String requestHeader : requestHeaders) {
             if (StringUtils.hasText(requestHeader)) {
                 requestHeader = requestHeader.trim();
                 if (allowAnyHeader) {
                     result.add(requestHeader);
                 } else {
-                    for (String allowedHeader : this.allowedHeaders) {
-                        if (requestHeader.equalsIgnoreCase(allowedHeader)) {
-                            result.add(requestHeader);
-                            break;
-                        }
-                    }
+                    loadAllowedHeaders(result, requestHeader);
                 }
             }
         }
-        return (result.isEmpty() ? null : result);
+    }
+
+    private void loadAllowedHeaders(List<String> result, String requestHeader) {
+        for (String allowedHeader : this.allowedHeaders) {
+            if (requestHeader.equalsIgnoreCase(allowedHeader)) {
+                result.add(requestHeader);
+                break;
+            }
+        }
     }
 
     private static class OriginPattern {
