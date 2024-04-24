@@ -16,26 +16,16 @@
  */
 package org.apache.dubbo.rpc.protocol.tri.rest.mapping;
 
-import org.apache.dubbo.common.config.Configuration;
-import org.apache.dubbo.common.config.ConfigurationUtils;
 import org.apache.dubbo.common.utils.Assert;
 import org.apache.dubbo.remoting.http12.HttpRequest;
-import org.apache.dubbo.remoting.http12.HttpResponse;
-import org.apache.dubbo.remoting.http12.HttpResult;
-import org.apache.dubbo.remoting.http12.HttpStatus;
-import org.apache.dubbo.remoting.http12.exception.HttpResultPayloadException;
 import org.apache.dubbo.remoting.http12.message.MethodMetadata;
 import org.apache.dubbo.rpc.Invoker;
-import org.apache.dubbo.rpc.model.ApplicationModel;
 import org.apache.dubbo.rpc.model.FrameworkModel;
 import org.apache.dubbo.rpc.model.MethodDescriptor;
 import org.apache.dubbo.rpc.model.ServiceDescriptor;
 import org.apache.dubbo.rpc.protocol.tri.DescriptorUtils;
 import org.apache.dubbo.rpc.protocol.tri.rest.RestConstants;
 import org.apache.dubbo.rpc.protocol.tri.rest.RestInitializeException;
-import org.apache.dubbo.rpc.protocol.tri.rest.cors.CorsMeta;
-import org.apache.dubbo.rpc.protocol.tri.rest.cors.CorsProcessor;
-import org.apache.dubbo.rpc.protocol.tri.rest.cors.CorsUtil;
 import org.apache.dubbo.rpc.protocol.tri.rest.mapping.RadixTree.Match;
 import org.apache.dubbo.rpc.protocol.tri.rest.mapping.condition.PathExpression;
 import org.apache.dubbo.rpc.protocol.tri.rest.mapping.condition.ProducesCondition;
@@ -62,12 +52,9 @@ public final class DefaultRequestMappingRegistry implements RequestMappingRegist
 
     private final RadixTree<Registration> tree = new RadixTree<>();
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
-    private CorsMeta globalCorsMeta;
-    private final CorsProcessor corsProcessor;
 
     public DefaultRequestMappingRegistry(FrameworkModel frameworkModel) {
         resolvers = frameworkModel.getActivateExtensions(RequestMappingResolver.class);
-        corsProcessor = frameworkModel.getBeanFactory().getOrRegisterBean(CorsProcessor.class);
     }
 
     @Override
@@ -81,7 +68,6 @@ public final class DefaultRequestMappingRegistry implements RequestMappingRegist
                     continue;
                 }
                 RequestMapping classMapping = resolver.resolve(serviceMeta);
-                mergeGlobalCorsMeta(classMapping);
                 consumer.accept((methods) -> {
                     MethodMeta methodMeta = new MethodMeta(methods, serviceMeta);
                     RequestMapping methodMapping = resolver.resolve(methodMeta);
@@ -129,17 +115,6 @@ public final class DefaultRequestMappingRegistry implements RequestMappingRegist
                 serviceDescriptor);
     }
 
-    private void mergeGlobalCorsMeta(RequestMapping mapping) {
-        if (mapping != null) {
-            CorsMeta corsMeta = mapping.getCorsMeta();
-            if (corsMeta != null) {
-                mapping.setCorsMeta(CorsMeta.combine(corsMeta, getGlobalCorsMeta()));
-            } else {
-                mapping.setCorsMeta(getGlobalCorsMeta());
-            }
-        }
-    }
-
     @Override
     public void unregister(Invoker<?> invoker) {
         lock.writeLock().lock();
@@ -160,7 +135,7 @@ public final class DefaultRequestMappingRegistry implements RequestMappingRegist
         }
     }
 
-    public HandlerMeta lookup(HttpRequest request, HttpResponse response) {
+    public HandlerMeta lookup(HttpRequest request) {
         String path = PathUtils.normalize(request.rawPath());
         request.setAttribute(RestConstants.PATH_ATTRIBUTE, path);
         List<Match<Registration>> matches = new ArrayList<>();
@@ -216,8 +191,6 @@ public final class DefaultRequestMappingRegistry implements RequestMappingRegist
         Candidate winner = candidates.get(0);
         RequestMapping mapping = winner.mapping;
 
-        processCors(mapping, request, response);
-
         HandlerMeta handler = winner.meta;
         request.setAttribute(RestConstants.MAPPING_ATTRIBUTE, mapping);
         request.setAttribute(RestConstants.HANDLER_ATTRIBUTE, handler);
@@ -232,25 +205,6 @@ public final class DefaultRequestMappingRegistry implements RequestMappingRegist
         }
 
         return handler;
-    }
-
-    private void processCors(RequestMapping mapping, HttpRequest request, HttpResponse response) {
-        if (!corsProcessor.process(mapping.getCorsMeta(), request, response)) {
-            throw new HttpResultPayloadException(HttpResult.builder()
-                    .status(HttpStatus.FORBIDDEN)
-                    .body(response.body())
-                    .headers(response.headers())
-                    .build());
-        }
-    }
-
-    private CorsMeta getGlobalCorsMeta() {
-        if (globalCorsMeta == null) {
-            Configuration globalConfiguration =
-                    ConfigurationUtils.getGlobalConfiguration(ApplicationModel.defaultModel());
-            globalCorsMeta = CorsUtil.resolveGlobalMeta(globalConfiguration);
-        }
-        return globalCorsMeta;
     }
 
     private static final class Registration {
