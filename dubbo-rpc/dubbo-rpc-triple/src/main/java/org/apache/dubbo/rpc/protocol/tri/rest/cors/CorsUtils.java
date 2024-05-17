@@ -27,13 +27,15 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 public class CorsUtils {
-    private static CorsMeta globalCorsMeta;
+    private CorsMeta globalCorsMeta;
     public static final String HTTP = "http";
     public static final String HTTPS = "https";
     public static final String WS = "ws";
     public static final String WSS = "wss";
 
-    private CorsUtils() {}
+    public CorsUtils() {
+        globalCorsMeta = new CorsMeta();
+    }
 
     public static int getPort(String scheme, int port) {
         if (port == -1) {
@@ -46,23 +48,18 @@ public class CorsUtils {
         return port;
     }
 
-    public static CorsMeta resolveGlobalMeta(Configuration config) {
-
+    public void resolveGlobalMeta(Configuration config) {
         // Get the CORS configuration properties from the configuration object.
         String allowOrigins = config.getString(RestConstants.ALLOWED_ORIGINS);
         String allowMethods = config.getString(RestConstants.ALLOWED_METHODS);
         String allowHeaders = config.getString(RestConstants.ALLOWED_HEADERS);
         String exposeHeaders = config.getString(RestConstants.EXPOSED_HEADERS);
         String maxAge = config.getString(RestConstants.MAX_AGE);
-        // Create a new CorsMeta object and set the properties.
-        CorsMeta meta = new CorsMeta();
-        meta.setAllowedOrigins(parseList(allowOrigins));
-        meta.setAllowedMethods(parseList(allowMethods));
-        meta.setAllowedHeaders(parseList(allowHeaders));
-        meta.setExposedHeaders(parseList(exposeHeaders));
-        meta.setMaxAge(maxAge == null ? null : Long.valueOf(maxAge));
-        // Return the CorsMeta object.
-        return meta.applyPermitDefaultValues();
+        globalCorsMeta.setAllowedOrigins(parseList(allowOrigins));
+        globalCorsMeta.setAllowedMethods(parseList(allowMethods));
+        globalCorsMeta.setAllowedHeaders(parseList(allowHeaders));
+        globalCorsMeta.setExposedHeaders(parseList(exposeHeaders));
+        globalCorsMeta.setMaxAge(maxAge == null ? null : Long.valueOf(maxAge));
     }
 
     @Nullable
@@ -73,11 +70,11 @@ public class CorsUtils {
         return Arrays.stream(value.split(",")).map(String::trim).collect(Collectors.toList());
     }
 
-    public static CorsMeta getGlobalCorsMeta() {
+    public CorsMeta getGlobalCorsMeta() {
         if (globalCorsMeta == null) {
             Configuration globalConfiguration =
                     ConfigurationUtils.getGlobalConfiguration(ApplicationModel.defaultModel());
-            globalCorsMeta = resolveGlobalMeta(globalConfiguration);
+            resolveGlobalMeta(globalConfiguration);
         }
         return globalCorsMeta;
     }
