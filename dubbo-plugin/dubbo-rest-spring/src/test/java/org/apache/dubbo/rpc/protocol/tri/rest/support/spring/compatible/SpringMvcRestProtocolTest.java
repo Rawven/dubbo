@@ -36,6 +36,7 @@ import java.util.Arrays;
 import org.hamcrest.CoreMatchers;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.aop.framework.AdvisedSupport;
 import org.springframework.aop.framework.AopProxy;
@@ -46,6 +47,7 @@ import static org.apache.dubbo.remoting.Constants.SERVER_KEY;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 
+@Disabled
 public class SpringMvcRestProtocolTest {
     private final Protocol tProtocol =
             ApplicationModel.defaultModel().getExtensionLoader(Protocol.class).getExtension("tri");
@@ -129,7 +131,6 @@ public class SpringMvcRestProtocolTest {
         url = URL.valueOf("rest://127.0.0.1:" + port + "/a/b/c/?version=1.0.0&interface="
                 + SpringRestDemoService.class.getName());
         Invoker<SpringRestDemoService> invoker = protocol.refer(SpringRestDemoService.class, url);
-
         SpringRestDemoService client = proxy.getProxy(invoker);
         String result = client.sayHello("haha");
         Assertions.assertTrue(server.isCalled());

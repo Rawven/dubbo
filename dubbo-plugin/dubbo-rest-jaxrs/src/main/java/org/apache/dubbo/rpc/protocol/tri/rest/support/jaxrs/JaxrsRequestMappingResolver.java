@@ -25,6 +25,7 @@ import org.apache.dubbo.rpc.protocol.tri.rest.mapping.RequestMappingResolver;
 import org.apache.dubbo.rpc.protocol.tri.rest.mapping.condition.ServiceVersionCondition;
 import org.apache.dubbo.rpc.protocol.tri.rest.mapping.meta.AnnotationMeta;
 import org.apache.dubbo.rpc.protocol.tri.rest.mapping.meta.AnnotationSupport;
+import org.apache.dubbo.rpc.protocol.tri.rest.mapping.meta.CorsMeta;
 import org.apache.dubbo.rpc.protocol.tri.rest.mapping.meta.MethodMeta;
 import org.apache.dubbo.rpc.protocol.tri.rest.mapping.meta.ServiceMeta;
 import org.apache.dubbo.rpc.protocol.tri.rest.util.RestToolKit;
@@ -32,12 +33,13 @@ import org.apache.dubbo.rpc.protocol.tri.rest.util.RestToolKit;
 @Activate(onClass = "javax.ws.rs.Path")
 public class JaxrsRequestMappingResolver implements RequestMappingResolver {
 
+    private final FrameworkModel frameworkModel;
     private final RestToolKit toolKit;
-    private final CorsUtils corsUtils;
+    private CorsMeta globalCorsMeta;
 
     public JaxrsRequestMappingResolver(FrameworkModel frameworkModel) {
+        this.frameworkModel = frameworkModel;
         toolKit = new JaxrsRestToolKit(frameworkModel);
-        corsUtils = frameworkModel.getBeanFactory().getOrRegisterBean(CorsUtils.class);
     }
 
     @Override
@@ -72,8 +74,15 @@ public class JaxrsRequestMappingResolver implements RequestMappingResolver {
                 .name(methodMeta.getMethod().getName())
                 .contextPath(methodMeta.getServiceMeta().getContextPath())
                 .custom(new ServiceVersionCondition(serviceMeta.getServiceGroup(), serviceMeta.getServiceVersion()))
-                .cors(corsUtils.getGlobalCorsMeta())
+                .cors(getGlobalCorsMeta())
                 .build();
+    }
+
+    private CorsMeta getGlobalCorsMeta() {
+        if (globalCorsMeta == null) {
+            globalCorsMeta = CorsUtils.getGlobalCorsMeta(frameworkModel);
+        }
+        return globalCorsMeta;
     }
 
     private Builder builder(AnnotationSupport meta, AnnotationMeta<?> path, AnnotationMeta<?> httpMethod) {
