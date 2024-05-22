@@ -16,21 +16,20 @@
  */
 package org.apache.dubbo.rpc.protocol.tri.rest.support.spring;
 
+import org.apache.dubbo.common.constants.CommonConstants;
 import org.apache.dubbo.common.extension.Activate;
 import org.apache.dubbo.common.utils.StringUtils;
 import org.apache.dubbo.rpc.model.FrameworkModel;
-import org.apache.dubbo.rpc.protocol.tri.rest.cors.CorsMeta;
+import org.apache.dubbo.rpc.protocol.tri.rest.cors.CorsUtils;
 import org.apache.dubbo.rpc.protocol.tri.rest.mapping.RequestMapping;
 import org.apache.dubbo.rpc.protocol.tri.rest.mapping.RequestMapping.Builder;
 import org.apache.dubbo.rpc.protocol.tri.rest.mapping.RequestMappingResolver;
 import org.apache.dubbo.rpc.protocol.tri.rest.mapping.condition.ServiceVersionCondition;
 import org.apache.dubbo.rpc.protocol.tri.rest.mapping.meta.AnnotationMeta;
+import org.apache.dubbo.rpc.protocol.tri.rest.mapping.meta.CorsMeta;
 import org.apache.dubbo.rpc.protocol.tri.rest.mapping.meta.MethodMeta;
 import org.apache.dubbo.rpc.protocol.tri.rest.mapping.meta.ServiceMeta;
 import org.apache.dubbo.rpc.protocol.tri.rest.util.RestToolKit;
-
-import java.util.Arrays;
-import java.util.Collections;
 
 import org.springframework.http.HttpStatus;
 
@@ -39,6 +38,7 @@ public class SpringMvcRequestMappingResolver implements RequestMappingResolver {
 
     private final FrameworkModel frameworkModel;
     private volatile RestToolKit toolKit;
+    private CorsMeta globalCorsMeta;
 
     public SpringMvcRequestMappingResolver(FrameworkModel frameworkModel) {
         this.frameworkModel = frameworkModel;
@@ -67,10 +67,12 @@ public class SpringMvcRequestMappingResolver implements RequestMappingResolver {
         }
         AnnotationMeta<?> responseStatus = serviceMeta.findMergedAnnotation(Annotations.ResponseStatus);
         AnnotationMeta<?> crossOrigin = serviceMeta.findMergedAnnotation(Annotations.CrossOrigin);
+        String[] methods = requestMapping.getStringArray("method");
         return builder(requestMapping, responseStatus)
+                .method(methods)
                 .name(serviceMeta.getType().getSimpleName())
                 .contextPath(serviceMeta.getContextPath())
-                .cors(createCorsMeta(crossOrigin))
+                .cors(buildCorsMeta(crossOrigin, methods))
                 .build();
     }
 
@@ -86,13 +88,14 @@ public class SpringMvcRequestMappingResolver implements RequestMappingResolver {
         }
         ServiceMeta serviceMeta = methodMeta.getServiceMeta();
         AnnotationMeta<?> responseStatus = methodMeta.findMergedAnnotation(Annotations.ResponseStatus);
-
         AnnotationMeta<?> crossOrigin = methodMeta.findMergedAnnotation(Annotations.CrossOrigin);
+        String[] methods = requestMapping.getStringArray("method");
         return builder(requestMapping, responseStatus)
+                .method(methods)
                 .name(methodMeta.getMethod().getName())
                 .contextPath(serviceMeta.getContextPath())
                 .custom(new ServiceVersionCondition(serviceMeta.getServiceGroup(), serviceMeta.getServiceVersion()))
-                .cors(createCorsMeta(crossOrigin))
+                .cors(buildCorsMeta(crossOrigin, methods))
                 .build();
     }
 
@@ -107,37 +110,34 @@ public class SpringMvcRequestMappingResolver implements RequestMappingResolver {
             }
         }
         return builder.path(requestMapping.getValueArray())
-                .method(requestMapping.getStringArray("method"))
                 .param(requestMapping.getStringArray("params"))
                 .header(requestMapping.getStringArray("headers"))
                 .consume(requestMapping.getStringArray("consumes"))
                 .produce(requestMapping.getStringArray("produces"));
     }
 
-    private CorsMeta createCorsMeta(AnnotationMeta<?> crossOrigin) {
-        CorsMeta meta = new CorsMeta();
+    private CorsMeta buildCorsMeta(AnnotationMeta<?> crossOrigin, String[] methods) {
+        if (globalCorsMeta == null) {
+            globalCorsMeta = CorsUtils.getGlobalCorsMeta(frameworkModel);
+        }
         if (crossOrigin == null) {
-            return meta;
+            return globalCorsMeta;
         }
-        String[] allowedHeaders = crossOrigin.getStringArray("allowedHeaders");
-        meta.setAllowedHeaders(allowedHeaders != null ? Arrays.asList(allowedHeaders) : Collections.emptyList());
-        String[] methods = crossOrigin.getStringArray("methods");
-        meta.setAllowedMethods(methods != null ? Arrays.asList(methods) : Collections.emptyList());
-        String[] origins = crossOrigin.getStringArray("origins");
-        meta.setAllowedOrigins(origins != null ? Arrays.asList(origins) : Collections.emptyList());
-        String[] exposedHeaders = crossOrigin.getStringArray("exposedHeaders");
-        meta.setExposedHeaders(exposedHeaders != null ? Arrays.asList(exposedHeaders) : Collections.emptyList());
-        String maxAge = crossOrigin.getString("maxAge");
-        meta.setMaxAge(maxAge != null ? Long.valueOf(maxAge) : null);
-        String allowCredentials = crossOrigin.getString("allowCredentials");
-        meta.setAllowCredentials(allowCredentials != null ? Boolean.valueOf(allowCredentials) : null);
-        // Because allowPrivateNetwork does not exist in some spring versions, we need to catch the exception
-        try {
-            String allowPrivateNetwork = crossOrigin.getString("allowPrivateNetwork");
-            meta.setAllowPrivateNetwork(allowPrivateNetwork != null ? Boolean.valueOf(allowPrivateNetwork) : null);
-        } catch (IllegalArgumentException e) {
-            meta.setAllowPrivateNetwork(null);
+        String[] allowedMethods = crossOrigin.getStringArray("methods");
+        if (allowedMethods.length == 0) {
+            allowedMethods = methods;
+            if (allowedMethods.length == 0) {
+                allowedMethods = new String[] {CommonConstants.ANY_VALUE};
+            }
         }
-        return meta;
+        CorsMeta corsMeta = CorsMeta.builder()
+                .allowedOrigins(crossOrigin.getStringArray("origins"))
+                .allowedMethods(allowedMethods)
+                .allowedHeaders(crossOrigin.getStringArray("allowedHeaders"))
+                .exposedHeaders(crossOrigin.getStringArray("exposedHeaders"))
+                .allowCredentials(crossOrigin.getString("allowCredentials"))
+                .maxAge(crossOrigin.getNumber("maxAge"))
+                .build();
+        return globalCorsMeta.combine(corsMeta);
     }
 }

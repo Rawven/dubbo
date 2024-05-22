@@ -21,49 +21,81 @@ import java.io.Serializable;
 public class CorsConfig implements Serializable {
     private static final long serialVersionUID = 1L;
 
-    private String allowedOrigins;
+    /**
+     * A list of origins for which cross-origin requests are allowed. Values may be a specific domain, e.g.
+     * {@code "https://domain1.com"}, or the CORS defined special value {@code "*"} for all origins.
+     * <p>By default this is not set which means that no origins are allowed.
+     * However, an instance of this class is often initialized further, e.g. for {@code @CrossOrigin}, via
+     * {@code org.apache.dubbo.rpc.protocol.tri.rest.mapping.meta.CorsMeta.Builder#applyDefault()}.
+     */
+    private String[] allowedOrigins;
 
-    private String allowedMethods;
+    /**
+     * Set the HTTP methods to allow, e.g. {@code "GET"}, {@code "POST"},
+     * {@code "PUT"}, etc. The special value {@code "*"} allows all methods.
+     * <p>If not set, only {@code "GET"} and {@code "HEAD"} are allowed.
+     * <p>By default this is not set.
+     */
+    private String[] allowedMethods;
 
-    private String allowedHeaders;
+    /**
+     * /**
+     * Set the list of headers that a pre-flight request can list as allowed
+     * for use during an actual request. The special value {@code "*"} allows
+     * actual requests to send any header.
+     * <p>By default this is not set.
+     */
+    private String[] allowedHeaders;
 
-    private String exposedHeaders;
+    /**
+     * Set the list of response headers that an actual response might have
+     * and can be exposed to the client. The special value {@code "*"}
+     * allows all headers to be exposed.
+     * <p>By default this is not set.
+     */
+    private String[] exposedHeaders;
 
+    /**
+     * Whether user credentials are supported.
+     * <p>By default this is not set (i.e. user credentials are not supported).
+     */
     private Boolean allowCredentials;
 
-    private Boolean allowPrivateNetWork;
-
+    /**
+     * Configure how long, as a duration, the response from a pre-flight request
+     * can be cached by clients.
+     */
     private Long maxAge;
 
-    public String getAllowedOrigins() {
+    public String[] getAllowedOrigins() {
         return allowedOrigins;
     }
 
-    public void setAllowedOrigins(String allowedOrigins) {
+    public void setAllowedOrigins(String[] allowedOrigins) {
         this.allowedOrigins = allowedOrigins;
     }
 
-    public String getAllowedMethods() {
+    public String[] getAllowedMethods() {
         return allowedMethods;
     }
 
-    public void setAllowedMethods(String allowedMethods) {
+    public void setAllowedMethods(String[] allowedMethods) {
         this.allowedMethods = allowedMethods;
     }
 
-    public String getAllowedHeaders() {
+    public String[] getAllowedHeaders() {
         return allowedHeaders;
     }
 
-    public void setAllowedHeaders(String allowedHeaders) {
+    public void setAllowedHeaders(String[] allowedHeaders) {
         this.allowedHeaders = allowedHeaders;
     }
 
-    public String getExposedHeaders() {
+    public String[] getExposedHeaders() {
         return exposedHeaders;
     }
 
-    public void setExposedHeaders(String exposedHeaders) {
+    public void setExposedHeaders(String[] exposedHeaders) {
         this.exposedHeaders = exposedHeaders;
     }
 
@@ -81,13 +113,5 @@ public class CorsConfig implements Serializable {
 
     public void setMaxAge(Long maxAge) {
         this.maxAge = maxAge;
-    }
-
-    public Boolean getAllowPrivateNetWork() {
-        return allowPrivateNetWork;
-    }
-
-    public void setAllowPrivateNetWork(Boolean allowPrivateNetWork) {
-        this.allowPrivateNetWork = allowPrivateNetWork;
     }
 }
