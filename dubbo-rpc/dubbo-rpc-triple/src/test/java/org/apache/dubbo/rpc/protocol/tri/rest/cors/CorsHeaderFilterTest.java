@@ -32,12 +32,9 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 class CorsHeaderFilterTest {
 
-    private static final Logger log = LoggerFactory.getLogger(CorsHeaderFilterTest.class);
     private HttpRequest request;
 
     private HttpResponse response;
@@ -46,29 +43,40 @@ class CorsHeaderFilterTest {
 
     private RequestMapping build;
 
-    class MockCorsHeaderFilter extends CorsHeaderFilter {
+    static class MockCorsHeaderFilter extends CorsHeaderFilter {
         public void process(HttpRequest request, HttpResponse response) {
             invoke(null, null, request, response);
+        }
+
+        public void preLightProcess(HttpRequest request, HttpResponse response, int code) {
+            try {
+                process(request, response);
+                Assertions.fail();
+            } catch (HttpResultPayloadException e) {
+                Assertions.assertEquals(code, e.getStatusCode());
+            } catch (Exception e) {
+                Assertions.fail();
+            }
         }
     }
 
     private CorsMeta defaultCorsMeta() {
-        return CorsMeta.builder().maxAge((long) 1000.0).build();
+        return CorsMeta.builder().maxAge(1000L).build();
     }
 
     @BeforeEach
     public void setup() {
         build = Mockito.mock(RequestMapping.class);
-        this.request = Mockito.mock(HttpRequest.class);
-        Mockito.when(this.request.attribute(RestConstants.MAPPING_ATTRIBUTE)).thenReturn(build);
-        Mockito.when(this.request.uri()).thenReturn("/test.html");
-        Mockito.when(this.request.serverName()).thenReturn("domain1.example");
-        Mockito.when(this.request.scheme()).thenReturn("http");
-        Mockito.when(this.request.serverPort()).thenReturn(80);
-        Mockito.when(this.request.remoteHost()).thenReturn("127.0.0.1");
-        this.response = new DefaultHttpResponse();
-        this.response.setStatus(HttpStatus.OK.getCode());
-        this.processor = new MockCorsHeaderFilter();
+        request = Mockito.mock(HttpRequest.class);
+        Mockito.when(request.attribute(RestConstants.MAPPING_ATTRIBUTE)).thenReturn(build);
+        Mockito.when(request.uri()).thenReturn("/test.html");
+        Mockito.when(request.serverName()).thenReturn("domain1.example");
+        Mockito.when(request.scheme()).thenReturn("http");
+        Mockito.when(request.serverPort()).thenReturn(80);
+        Mockito.when(request.remoteHost()).thenReturn("127.0.0.1");
+        response = new DefaultHttpResponse();
+        response.setStatus(HttpStatus.OK.getCode());
+        processor = new MockCorsHeaderFilter();
     }
 
     @Test
@@ -76,14 +84,14 @@ class CorsHeaderFilterTest {
         Mockito.when(request.method()).thenReturn(HttpMethods.GET.name());
         Mockito.when(build.getCors()).thenReturn(CorsMeta.builder().build());
         Mockito.when(build.getCors()).thenReturn(defaultCorsMeta());
-        this.processor.process(this.request, this.response);
-        Assertions.assertFalse(this.response.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_ORIGIN));
-        Assertions.assertTrue(this.response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ORIGIN));
+        processor.process(request, response);
+        Assertions.assertFalse(response.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_ORIGIN));
+        Assertions.assertTrue(response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ORIGIN));
         Assertions.assertTrue(
-                this.response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_METHOD));
+                response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_METHOD));
         Assertions.assertTrue(
-                this.response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_HEADERS));
-        Assertions.assertEquals(HttpStatus.OK.getCode(), this.response.status());
+                response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_HEADERS));
+        Assertions.assertEquals(HttpStatus.OK.getCode(), response.status());
     }
 
     @Test
@@ -91,14 +99,14 @@ class CorsHeaderFilterTest {
         Mockito.when(request.method()).thenReturn(HttpMethods.GET.name());
         Mockito.when(request.header(CorsHeaderFilter.ORIGIN)).thenReturn("http://domain1.example");
         Mockito.when(build.getCors()).thenReturn(defaultCorsMeta());
-        this.processor.process(this.request, this.response);
-        Assertions.assertFalse(this.response.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_ORIGIN));
-        Assertions.assertTrue(this.response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ORIGIN));
+        processor.process(request, response);
+        Assertions.assertFalse(response.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_ORIGIN));
+        Assertions.assertTrue(response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ORIGIN));
         Assertions.assertTrue(
-                this.response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_METHOD));
+                response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_METHOD));
         Assertions.assertTrue(
-                this.response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_HEADERS));
-        Assertions.assertEquals(HttpStatus.OK.getCode(), this.response.status());
+                response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_HEADERS));
+        Assertions.assertEquals(HttpStatus.OK.getCode(), response.status());
     }
 
     @Test
@@ -106,9 +114,7 @@ class CorsHeaderFilterTest {
         Mockito.when(request.method()).thenReturn(HttpMethods.GET.name());
         Mockito.when(request.header(CorsHeaderFilter.ORIGIN)).thenReturn("https://domain2.com");
         Mockito.when(build.getCors()).thenReturn(defaultCorsMeta());
-        Assertions.assertThrows(HttpResultPayloadException.class, () -> {
-            this.processor.process(this.request, this.response);
-        });
+        Assertions.assertThrows(HttpResultPayloadException.class, () -> processor.process(request, response));
     }
 
     @Test
@@ -116,28 +122,27 @@ class CorsHeaderFilterTest {
         Mockito.when(request.method()).thenReturn(HttpMethods.GET.name());
         Mockito.when(request.header(CorsHeaderFilter.ORIGIN)).thenReturn("https://domain2.com");
         Mockito.when(build.getCors()).thenReturn(null);
-        this.processor.process(this.request, this.response);
-        Assertions.assertFalse(this.response.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_ORIGIN));
-        Assertions.assertEquals(HttpStatus.OK.getCode(), this.response.status());
+        processor.process(request, response);
+        Assertions.assertFalse(response.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_ORIGIN));
+        Assertions.assertEquals(HttpStatus.OK.getCode(), response.status());
     }
 
     @Test
     void actualRequestWithOriginHeaderAndAllowedOrigin() {
         Mockito.when(request.method()).thenReturn(HttpMethods.GET.name());
         Mockito.when(request.header(CorsHeaderFilter.ORIGIN)).thenReturn("https://domain2.com");
-        Mockito.when(build.getCors())
-                .thenReturn(CorsMeta.builder().allowedOrigins("*").build());
-        this.processor.process(this.request, this.response);
-        Assertions.assertTrue(this.response.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_ORIGIN));
-        Assertions.assertEquals("*", this.response.header(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_ORIGIN));
-        Assertions.assertFalse(this.response.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_MAX_AGE));
-        Assertions.assertFalse(this.response.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_EXPOSE_HEADERS));
-        Assertions.assertTrue(this.response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ORIGIN));
+        Mockito.when(build.getCors()).thenReturn(CorsMeta.builder().build().applyDefault());
+        processor.process(request, response);
+        Assertions.assertTrue(response.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_ORIGIN));
+        Assertions.assertEquals("*", response.header(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_ORIGIN));
+        Assertions.assertFalse(response.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_MAX_AGE));
+        Assertions.assertFalse(response.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_EXPOSE_HEADERS));
+        Assertions.assertTrue(response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ORIGIN));
         Assertions.assertTrue(
-                this.response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_METHOD));
+                response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_METHOD));
         Assertions.assertTrue(
-                this.response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_HEADERS));
-        Assertions.assertEquals(HttpStatus.OK.getCode(), this.response.status());
+                response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_HEADERS));
+        Assertions.assertEquals(HttpStatus.OK.getCode(), response.status());
     }
 
     @Test
@@ -145,11 +150,13 @@ class CorsHeaderFilterTest {
         Mockito.when(request.method()).thenReturn(HttpMethods.GET.name());
         Mockito.when(request.header(CorsHeaderFilter.ORIGIN)).thenReturn("https://domain2.com");
         Mockito.when(build.getCors())
-                .thenReturn(
-                        CorsMeta.builder().allowedOrigins("https://DOMAIN2.com").build());
-        this.processor.process(this.request, this.response);
-        Assertions.assertEquals(HttpStatus.OK.getCode(), this.response.status());
-        Assertions.assertTrue(this.response.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_ORIGIN));
+                .thenReturn(CorsMeta.builder()
+                        .allowedOrigins("https://DOMAIN2.com")
+                        .build()
+                        .applyDefault());
+        processor.process(request, response);
+        Assertions.assertEquals(HttpStatus.OK.getCode(), response.status());
+        Assertions.assertTrue(response.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_ORIGIN));
     }
 
     @Test
@@ -159,10 +166,11 @@ class CorsHeaderFilterTest {
         Mockito.when(build.getCors())
                 .thenReturn(CorsMeta.builder()
                         .allowedOrigins("https://domain2.com/")
-                        .build());
-        this.processor.process(this.request, this.response);
-        Assertions.assertEquals(HttpStatus.OK.getCode(), this.response.status());
-        Assertions.assertTrue(this.response.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_ORIGIN));
+                        .build()
+                        .applyDefault());
+        processor.process(request, response);
+        Assertions.assertEquals(HttpStatus.OK.getCode(), response.status());
+        Assertions.assertTrue(response.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_ORIGIN));
     }
 
     @Test
@@ -172,46 +180,59 @@ class CorsHeaderFilterTest {
         Mockito.doReturn(CorsMeta.builder()
                         .allowedOrigins("https://domain2.com")
                         .exposedHeaders("header1", "header2")
-                        .build())
+                        .build()
+                        .applyDefault())
                 .when(build)
                 .getCors();
-        this.processor.process(this.request, this.response);
-        Assertions.assertTrue(this.response.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_ORIGIN));
-        Assertions.assertEquals(
-                "https://domain2.com", this.response.header(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_ORIGIN));
-        Assertions.assertTrue(this.response.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_EXPOSE_HEADERS));
-        Assertions.assertTrue(this.response
-                .header(CorsHeaderFilter.ACCESS_CONTROL_EXPOSE_HEADERS)
-                .contains("header1"));
-        Assertions.assertTrue(this.response
-                .header(CorsHeaderFilter.ACCESS_CONTROL_EXPOSE_HEADERS)
-                .contains("header2"));
-        Assertions.assertTrue(this.response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ORIGIN));
+        processor.process(request, response);
+        Assertions.assertTrue(response.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_ORIGIN));
+        Assertions.assertEquals("https://domain2.com", response.header(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_ORIGIN));
+        Assertions.assertTrue(response.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_EXPOSE_HEADERS));
         Assertions.assertTrue(
-                this.response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_METHOD));
+                response.header(CorsHeaderFilter.ACCESS_CONTROL_EXPOSE_HEADERS).contains("header1"));
         Assertions.assertTrue(
-                this.response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_HEADERS));
-        Assertions.assertEquals(HttpStatus.OK.getCode(), this.response.status());
+                response.header(CorsHeaderFilter.ACCESS_CONTROL_EXPOSE_HEADERS).contains("header2"));
+        Assertions.assertTrue(response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ORIGIN));
+        Assertions.assertTrue(
+                response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_METHOD));
+        Assertions.assertTrue(
+                response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_HEADERS));
+        Assertions.assertEquals(HttpStatus.OK.getCode(), response.status());
     }
 
     @Test
-    void preflightRequestWithoutRequestheader() {
-        Mockito.when(request.method()).thenReturn(HttpMethods.OPTIONS.name());
+    void actualRequestCredentials() {
+        Mockito.when(request.method()).thenReturn(HttpMethods.GET.name());
         Mockito.when(request.header(CorsHeaderFilter.ORIGIN)).thenReturn("https://domain2.com");
-        Mockito.when(request.header(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_METHOD))
-                .thenReturn("GET");
-        Mockito.when(request.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_METHOD))
-                .thenReturn(true);
-        Mockito.when(build.getCors())
-                .thenReturn(CorsMeta.builder().allowedOrigins("*").build());
-        try {
-            this.processor.process(this.request, this.response);
-            Assertions.fail();
-        } catch (HttpResultPayloadException e) {
-            Assertions.assertEquals(HttpStatus.NO_CONTENT.getCode(), e.getStatusCode());
-        } catch (Exception e) {
-            Assertions.fail();
-        }
+        Mockito.doReturn(CorsMeta.builder()
+                        .allowedOrigins("https://domain1.com", "https://domain2.com")
+                        .allowCredentials(true)
+                        .build()
+                        .applyDefault())
+                .when(build)
+                .getCors();
+        processor.process(request, response);
+        Assertions.assertTrue(response.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_ORIGIN));
+        Assertions.assertEquals("https://domain2.com", response.header(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_ORIGIN));
+        Assertions.assertTrue(response.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_CREDENTIALS));
+        Assertions.assertEquals("true", response.header(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_CREDENTIALS));
+        Assertions.assertTrue(response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ORIGIN));
+        Assertions.assertEquals(HttpStatus.OK.getCode(), response.status());
+    }
+
+    @Test
+    void actualRequestCredentialsWithWildcardOrigin() {
+        Mockito.when(request.method()).thenReturn(HttpMethods.GET.name());
+        Mockito.when(request.header(CorsHeaderFilter.ORIGIN)).thenReturn("https://domain2.com");
+        Mockito.doReturn(CorsMeta.builder()
+                        .allowedOrigins("*")
+                        .allowCredentials(true)
+                        .build()
+                        .applyDefault())
+                .when(build)
+                .getCors();
+
+        Assertions.assertThrows(IllegalArgumentException.class, () -> processor.process(request, response));
     }
 
     @Test
@@ -224,14 +245,7 @@ class CorsHeaderFilterTest {
                 .thenReturn(true);
         Mockito.when(build.getCors())
                 .thenReturn(CorsMeta.builder().allowedOrigins("*").build());
-        try {
-            this.processor.process(this.request, this.response);
-            Assertions.fail();
-        } catch (HttpResultPayloadException e) {
-            Assertions.assertEquals(HttpStatus.FORBIDDEN.getCode(), e.getStatusCode());
-        } catch (Exception e) {
-            Assertions.fail();
-        }
+        processor.preLightProcess(request, response, HttpStatus.FORBIDDEN.getCode());
     }
 
     @Test
@@ -242,17 +256,8 @@ class CorsHeaderFilterTest {
                 .thenReturn("GET");
         Mockito.when(request.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_METHOD))
                 .thenReturn(true);
-        Mockito.when(build.getCors())
-                .thenReturn(
-                        CorsMeta.builder().allowedOrigins("*").applyDefault().build());
-        try {
-            this.processor.process(this.request, this.response);
-            Assertions.fail();
-        } catch (HttpResultPayloadException e) {
-            Assertions.assertEquals(HttpStatus.NO_CONTENT.getCode(), e.getStatusCode());
-        } catch (Exception e) {
-            Assertions.fail();
-        }
+        Mockito.when(build.getCors()).thenReturn(CorsMeta.builder().build().applyDefault());
+        processor.preLightProcess(request, response, HttpStatus.NO_CONTENT.getCode());
     }
 
     @Test
@@ -262,14 +267,7 @@ class CorsHeaderFilterTest {
         Mockito.when(request.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_METHOD))
                 .thenReturn(true);
         Mockito.when(build.getCors()).thenReturn(defaultCorsMeta());
-        try {
-            this.processor.process(this.request, this.response);
-            Assertions.fail();
-        } catch (HttpResultPayloadException e) {
-            Assertions.assertEquals(HttpStatus.FORBIDDEN.getCode(), e.getStatusCode());
-        } catch (Exception e) {
-            Assertions.fail();
-        }
+        processor.preLightProcess(request, response, HttpStatus.FORBIDDEN.getCode());
     }
 
     @Test
@@ -281,14 +279,7 @@ class CorsHeaderFilterTest {
         Mockito.when(request.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_METHOD))
                 .thenReturn(true);
         Mockito.when(build.getCors()).thenReturn(defaultCorsMeta());
-        try {
-            this.processor.process(this.request, this.response);
-            Assertions.fail();
-        } catch (HttpResultPayloadException e) {
-            Assertions.assertEquals(HttpStatus.FORBIDDEN.getCode(), e.getStatusCode());
-        } catch (Exception e) {
-            Assertions.fail();
-        }
+        processor.preLightProcess(request, response, HttpStatus.FORBIDDEN.getCode());
     }
 
     @Test
@@ -302,14 +293,7 @@ class CorsHeaderFilterTest {
         Mockito.when(request.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_METHOD))
                 .thenReturn(true);
         Mockito.when(build.getCors()).thenReturn(defaultCorsMeta());
-        try {
-            this.processor.process(this.request, this.response);
-            Assertions.fail();
-        } catch (HttpResultPayloadException e) {
-            Assertions.assertEquals(HttpStatus.FORBIDDEN.getCode(), e.getStatusCode());
-        } catch (Exception e) {
-            Assertions.fail();
-        }
+        processor.preLightProcess(request, response, HttpStatus.FORBIDDEN.getCode());
     }
 
     @Test
@@ -328,25 +312,7 @@ class CorsHeaderFilterTest {
                         .allowedMethods("GET", "PUT")
                         .allowedHeaders("Header1", "Header2")
                         .build());
-        try {
-            this.processor.process(this.request, this.response);
-            Assertions.fail();
-        } catch (HttpResultPayloadException e) {
-            Assertions.assertEquals(HttpStatus.NO_CONTENT.getCode(), e.getStatusCode());
-        } catch (Exception e) {
-            Assertions.fail();
-        }
-        Assertions.assertTrue(this.response.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_ORIGIN));
-        Assertions.assertEquals("*", this.response.header(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_ORIGIN));
-        Assertions.assertTrue(this.response.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_METHODS));
-        log.info("{}", this.response.headerValues(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_METHODS));
-        Assertions.assertEquals("GET, PUT", this.response.header(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_METHODS));
-        Assertions.assertFalse(this.response.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_MAX_AGE));
-        Assertions.assertTrue(this.response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ORIGIN));
-        Assertions.assertTrue(
-                this.response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_METHOD));
-        Assertions.assertTrue(
-                this.response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_HEADERS));
+        processor.preLightProcess(request, response, HttpStatus.NO_CONTENT.getCode());
     }
 
     @Test
@@ -363,34 +329,11 @@ class CorsHeaderFilterTest {
         Mockito.doReturn(CorsMeta.builder()
                         .allowedOrigins("https://domain2.com")
                         .allowedHeaders("Header1", "Header2")
-                        .build())
+                        .build()
+                        .applyDefault())
                 .when(build)
                 .getCors();
-        try {
-            this.processor.process(this.request, this.response);
-            Assertions.fail();
-        } catch (HttpResultPayloadException e) {
-            Assertions.assertEquals(HttpStatus.NO_CONTENT.getCode(), e.getStatusCode());
-        } catch (Exception e) {
-            Assertions.fail();
-        }
-        Assertions.assertTrue(this.response.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_ORIGIN));
-        Assertions.assertTrue(this.response.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_HEADERS));
-        Assertions.assertTrue(this.response
-                .header(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_HEADERS)
-                .contains("Header1"));
-        Assertions.assertTrue(this.response
-                .header(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_HEADERS)
-                .contains("Header2"));
-        Assertions.assertFalse(this.response
-                .header(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_HEADERS)
-                .contains("Header3"));
-        Assertions.assertTrue(this.response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ORIGIN));
-        Assertions.assertTrue(
-                this.response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_METHOD));
-        Assertions.assertTrue(
-                this.response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_HEADERS));
-        Assertions.assertEquals(HttpStatus.OK.getCode(), this.response.status());
+        processor.preLightProcess(request, response, HttpStatus.NO_CONTENT.getCode());
     }
 
     @Test
@@ -408,31 +351,9 @@ class CorsHeaderFilterTest {
                 .thenReturn(CorsMeta.builder()
                         .allowedOrigins("https://domain2.com")
                         .allowedHeaders("*")
-                        .build());
-        try {
-            this.processor.process(this.request, this.response);
-            Assertions.fail();
-        } catch (HttpResultPayloadException e) {
-            Assertions.assertEquals(HttpStatus.NO_CONTENT.getCode(), e.getStatusCode());
-        } catch (Exception e) {
-            Assertions.fail();
-        }
-        Assertions.assertTrue(this.response.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_ORIGIN));
-        Assertions.assertTrue(this.response.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_HEADERS));
-        Assertions.assertTrue(this.response
-                .header(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_HEADERS)
-                .contains("Header1"));
-        Assertions.assertTrue(this.response
-                .header(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_HEADERS)
-                .contains("Header2"));
-        Assertions.assertFalse(this.response
-                .header(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_HEADERS)
-                .contains("*"));
-        Assertions.assertTrue(this.response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ORIGIN));
-        Assertions.assertTrue(
-                this.response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_METHOD));
-        Assertions.assertTrue(
-                this.response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_HEADERS));
+                        .build()
+                        .applyDefault());
+        processor.preLightProcess(request, response, HttpStatus.NO_CONTENT.getCode());
     }
 
     @Test
@@ -449,22 +370,9 @@ class CorsHeaderFilterTest {
                 .thenReturn(CorsMeta.builder()
                         .allowedOrigins("https://domain2.com")
                         .allowedHeaders("*")
-                        .build());
-        try {
-            this.processor.process(this.request, this.response);
-            Assertions.fail();
-        } catch (HttpResultPayloadException e) {
-            Assertions.assertEquals(HttpStatus.NO_CONTENT.getCode(), e.getStatusCode());
-        } catch (Exception e) {
-            Assertions.fail();
-        }
-        Assertions.assertTrue(this.response.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_ORIGIN));
-        Assertions.assertFalse(this.response.hasHeader(CorsHeaderFilter.ACCESS_CONTROL_ALLOW_HEADERS));
-        Assertions.assertTrue(this.response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ORIGIN));
-        Assertions.assertTrue(
-                this.response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_METHOD));
-        Assertions.assertTrue(
-                this.response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_HEADERS));
+                        .build()
+                        .applyDefault());
+        processor.preLightProcess(request, response, HttpStatus.NO_CONTENT.getCode());
     }
 
     @Test
@@ -475,28 +383,41 @@ class CorsHeaderFilterTest {
                 .thenReturn("GET");
         Mockito.when(build.getCors())
                 .thenReturn(CorsMeta.builder().allowedOrigins("*").build());
-        try {
-            this.processor.process(this.request, this.response);
-            Assertions.fail();
-        } catch (HttpResultPayloadException e) {
-            Assertions.assertEquals(HttpStatus.FORBIDDEN.getCode(), e.getStatusCode());
-        } catch (Exception e) {
-            Assertions.fail();
-        }
+        processor.preLightProcess(request, response, HttpStatus.FORBIDDEN.getCode());
+    }
+
+    @Test
+    void preflightRequestCredentials() {
+        Mockito.when(request.method()).thenReturn(HttpMethods.OPTIONS.name());
+        Mockito.when(request.header(CorsHeaderFilter.ORIGIN)).thenReturn("https://domain2.com");
+        Mockito.when(request.header(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_METHOD))
+                .thenReturn("GET");
+        Mockito.doReturn(true).when(request).hasHeader(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_METHOD);
+        Mockito.when(request.header(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_HEADERS))
+                .thenReturn("Header1");
+        Mockito.doReturn(CorsMeta.builder()
+                        .allowedOrigins("https://domain1.com", "https://domain2.com", "http://domain3.example")
+                        .allowedHeaders("Header1")
+                        .allowCredentials(true)
+                        .build()
+                        .applyDefault())
+                .when(build)
+                .getCors();
+        processor.preLightProcess(request, response, HttpStatus.NO_CONTENT.getCode());
     }
 
     @Test
     void preventDuplicatedVaryHeaders() {
         Mockito.when(request.method()).thenReturn(HttpMethods.GET.name());
-        this.response.setHeader(
+        response.setHeader(
                 CorsHeaderFilter.VARY,
                 CorsHeaderFilter.ORIGIN + "," + CorsHeaderFilter.ACCESS_CONTROL_REQUEST_METHOD + ","
                         + CorsHeaderFilter.ACCESS_CONTROL_REQUEST_HEADERS);
-        this.processor.process(this.request, this.response);
-        Assertions.assertTrue(this.response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ORIGIN));
+        processor.process(request, response);
+        Assertions.assertTrue(response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ORIGIN));
         Assertions.assertTrue(
-                this.response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_METHOD));
+                response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_METHOD));
         Assertions.assertTrue(
-                this.response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_HEADERS));
+                response.header(CorsHeaderFilter.VARY).contains(CorsHeaderFilter.ACCESS_CONTROL_REQUEST_HEADERS));
     }
 }

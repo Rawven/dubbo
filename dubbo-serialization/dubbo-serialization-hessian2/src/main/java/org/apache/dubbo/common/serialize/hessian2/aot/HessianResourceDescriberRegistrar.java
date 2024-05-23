@@ -14,13 +14,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.dubbo.rpc;
+package org.apache.dubbo.common.serialize.hessian2.aot;
 
-import org.apache.dubbo.common.extension.ExtensionScope;
-import org.apache.dubbo.common.extension.SPI;
+import org.apache.dubbo.aot.api.ResourceBundleDescriber;
+import org.apache.dubbo.aot.api.ResourceDescriberRegistrar;
+import org.apache.dubbo.aot.api.ResourcePatternDescriber;
 
-@SPI(scope = ExtensionScope.FRAMEWORK)
-public interface HeaderFilter {
+import java.util.Collections;
+import java.util.List;
 
-    RpcInvocation invoke(Invoker<?> invoker, RpcInvocation invocation) throws RpcException;
+public class HessianResourceDescriberRegistrar implements ResourceDescriberRegistrar {
+    @Override
+    public List<ResourcePatternDescriber> getResourcePatternDescribers() {
+        return Collections.singletonList(new ResourcePatternDescriber("DENY_CLASS", null));
+    }
+
+    @Override
+    public List<ResourceBundleDescriber> getResourceBundleDescribers() {
+        return Collections.emptyList();
+    }
 }
