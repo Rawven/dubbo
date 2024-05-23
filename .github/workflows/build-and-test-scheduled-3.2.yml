@@ -230,8 +230,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          repository: 'apache/dubbo-samples'
-          ref: master
+          repository: 'Rawven/dubbo-samples'
+          ref: 3.3-triple-cors
       - name: "Prepare test list"
         run: |
           bash ./test/scripts/prepare-test.sh
@@ -256,8 +256,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          repository: 'apache/dubbo-samples'
-          ref: master
+          repository: 'Rawven/dubbo-samples'
+          ref: 3.3-triple-cors
       - name: "Cache local Maven repository"
         uses: actions/cache@v3
         with:
@@ -311,8 +311,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          repository: 'apache/dubbo-samples'
-          ref: master
+          repository: 'Rawven/dubbo-samples'
+          ref: 3.3-triple-cors
       - name: "Download test result"
         uses: actions/download-artifact@v3
         with:
